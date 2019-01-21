@@ -117,7 +117,7 @@ class Processor : AbstractProcessor() {
             val functionOneGenerics = generateFunctionOneGenerics(observerGenerics)
             val liveDataFieldName = "get${variableName.substring(0, 1)
                 .toUpperCase()}${variableName.substring(1)}"
-            val observer = ClassName.get("android.arch.lifecycle", "Observer")
+            val observer = ClassName.get(getLifeCyclePackage(), "Observer")
             val liveDataObservationCode = generateLiveDataObservationCode(
                 liveDataFieldName,
                 observerGenerics,
@@ -153,7 +153,7 @@ class Processor : AbstractProcessor() {
         val packageName = elementUtils.getPackageOf(typeElement)
             .qualifiedName
         val variableTypeName = declaredType.asElement().simpleName
-        val isPackageArch = packageName.contentEquals("android.arch.lifecycle")
+        val isPackageArch = packageName.contentEquals(getLifeCyclePackage())
         val isClassLiveData = variableTypeName.contentEquals("MutableLiveData")
         return if (isPackageArch && isClassLiveData) {
             declaredType
@@ -194,7 +194,7 @@ class Processor : AbstractProcessor() {
         classBuilder: TypeSpec.Builder
     ) {
         val functionOne = ClassName.get("kotlin.jvm.functions", "Function1")
-        val lifecycleOwner = ClassName.get("android.arch.lifecycle", "LifecycleOwner")
+        val lifecycleOwner = ClassName.get(getLifeCyclePackage(), "LifecycleOwner")
 
         val dslMethod = MethodSpec.methodBuilder(variableName).apply {
             addModifiers(Modifier.PUBLIC)
@@ -260,6 +260,16 @@ class Processor : AbstractProcessor() {
 
     override fun getSupportedAnnotationTypes(): Set<String> {
         return setOf(LiveData::class.java.canonicalName)
+    }
+
+    private fun getLifeCyclePackage(): String {
+        return if (ANDROID_X) LIFE_CYCLE_PACKAGE_X else LIFE_CYCLE_PACKAGE
+    }
+
+    companion object {
+        const val ANDROID_X = false
+        const val LIFE_CYCLE_PACKAGE = "android.arch.lifecycle"
+        const val LIFE_CYCLE_PACKAGE_X = "androidx.lifecycle"
     }
 
 }
