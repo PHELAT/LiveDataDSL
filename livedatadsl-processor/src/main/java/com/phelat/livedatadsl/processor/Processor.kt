@@ -85,15 +85,15 @@ class Processor : AbstractProcessor() {
         val constructorBuilder = MethodSpec.constructorBuilder().apply {
             addModifiers(constructor.modifiers)
             val superCall = StringBuilder("super(")
-            for (i in constructorParameters.indices) {
-                val modifiers = constructorParameters[i].modifiers
+            constructorParameters.forEachIndexed { index, variableElement ->
+                val modifiers = variableElement.modifiers
                 addParameter(
-                    TypeName.get(constructorParameters[i].asType()),
-                    constructorParameters[i].simpleName.toString(),
+                    TypeName.get(variableElement.asType()),
+                    variableElement.simpleName.toString(),
                     *modifiers.toTypedArray()
                 )
-                superCall.append(constructorParameters[i].simpleName.toString())
-                if (i < constructorParameters.size - 1) {
+                superCall.append(variableElement.simpleName.toString())
+                if (index < constructorParameters.size - 1) {
                     superCall.append(", ")
                 }
             }
