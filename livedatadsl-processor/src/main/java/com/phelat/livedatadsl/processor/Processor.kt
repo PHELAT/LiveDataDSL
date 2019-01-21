@@ -1,6 +1,6 @@
 package com.phelat.livedatadsl.processor
 
-import com.phelat.livedatadsl.LiveData
+import com.phelat.livedatadsl.LiveDataDSL
 import com.squareup.javapoet.ClassName
 import com.squareup.javapoet.CodeBlock
 import com.squareup.javapoet.JavaFile
@@ -111,7 +111,7 @@ class Processor : AbstractProcessor() {
     private fun generateDSLs(element: Element, classBuilder: TypeSpec.Builder) {
         val variable = element as VariableElement
         val variableName = variable.simpleName.toString()
-        val liveData = variable.getAnnotation(LiveData::class.java)
+        val liveData = variable.getAnnotation(LiveDataDSL::class.java)
         if (liveData != null) {
             val observerGenerics = generateObserverGenerics(variable)
             val functionOneGenerics = generateFunctionOneGenerics(observerGenerics)
@@ -259,7 +259,7 @@ class Processor : AbstractProcessor() {
     }
 
     override fun getSupportedAnnotationTypes(): Set<String> {
-        return setOf(LiveData::class.java.canonicalName)
+        return setOf(LiveDataDSL::class.java.canonicalName)
     }
 
     private fun getLifeCyclePackage(): String {
