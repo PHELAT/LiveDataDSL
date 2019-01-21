@@ -2,7 +2,7 @@ package com.phelat.livedatadsl.sample
 
 import android.arch.lifecycle.MutableLiveData
 import android.arch.lifecycle.ViewModel
-import com.phelat.livedatadsl.LiveDataDSL
+import com.phelat.livedatadsl.annotation.LiveDataDSL
 
 open class SampleViewModel : ViewModel() {
 

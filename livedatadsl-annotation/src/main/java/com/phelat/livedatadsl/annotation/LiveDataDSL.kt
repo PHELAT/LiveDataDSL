@@ -1,4 +1,4 @@
-package com.phelat.livedatadsl
+package com.phelat.livedatadsl.annotation
 
 @Retention(AnnotationRetention.SOURCE)
 @Target(AnnotationTarget.FIELD)

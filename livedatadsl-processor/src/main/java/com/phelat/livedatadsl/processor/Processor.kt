@@ -1,6 +1,6 @@
 package com.phelat.livedatadsl.processor
 
-import com.phelat.livedatadsl.LiveDataDSL
+import com.phelat.livedatadsl.annotation.LiveDataDSL
 import com.squareup.javapoet.ClassName
 import com.squareup.javapoet.CodeBlock
 import com.squareup.javapoet.JavaFile
