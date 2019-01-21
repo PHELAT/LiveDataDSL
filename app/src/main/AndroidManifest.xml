@@ -1,6 +1,6 @@
 <manifest
     xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.phelat.livedatadsl">
+    package="com.phelat.livedatadsl.sample">
 
     <application
         android:allowBackup="true"
