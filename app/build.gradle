@@ -32,7 +32,7 @@ dependencies {
     implementation "android.arch.lifecycle:extensions:1.1.1"
     kapt "android.arch.lifecycle:compiler:1.1.1"
 
-    implementation project(":livedatadsl")
+    implementation project(':livedatadsl-annotation')
 
     kapt project(":livedatadsl-processor")
 
