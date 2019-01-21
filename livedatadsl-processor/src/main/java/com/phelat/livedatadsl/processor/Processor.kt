@@ -24,7 +24,6 @@ import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.util.Elements
-import javax.lang.model.util.Types
 import javax.tools.Diagnostic
 
 class Processor : AbstractProcessor() {
@@ -137,8 +136,8 @@ class Processor : AbstractProcessor() {
         val generics = StringBuilder()
         if (variable.asType() is DeclaredType) {
             val declaredType = variable.asType() as DeclaredType
-            declaredType.enclosingType
-            val typeArguments = declaredType.typeArguments
+            val mutableLiveData = getMutableLiveData(declaredType)
+            val typeArguments = mutableLiveData.typeArguments
             typeArguments.forEachIndexed { index, typeMirror ->
                 generics.append(typeMirror.toString())
                 if (index < typeArguments.size - 1) {
@@ -147,6 +146,20 @@ class Processor : AbstractProcessor() {
             }
         }
         return generics.toString()
+    }
+
+    private fun getMutableLiveData(declaredType: DeclaredType): DeclaredType {
+        val typeElement = declaredType.asElement() as TypeElement
+        val packageName = elementUtils.getPackageOf(typeElement)
+            .qualifiedName
+        val variableTypeName = declaredType.asElement().simpleName
+        val isPackageArch = packageName.contentEquals("android.arch.lifecycle")
+        val isClassLiveData = variableTypeName.contentEquals("MutableLiveData")
+        return if (isPackageArch && isClassLiveData) {
+            declaredType
+        } else {
+            getMutableLiveData(typeElement.superclass as DeclaredType)
+        }
     }
 
     private fun generateLiveDataObservationCode(
