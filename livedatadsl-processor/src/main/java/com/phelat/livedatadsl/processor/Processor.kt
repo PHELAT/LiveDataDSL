@@ -2,10 +2,12 @@ package com.phelat.livedatadsl.processor
 
 import com.phelat.livedatadsl.LiveData
 import com.squareup.javapoet.ClassName
+import com.squareup.javapoet.CodeBlock
 import com.squareup.javapoet.JavaFile
 import com.squareup.javapoet.MethodSpec
 import com.squareup.javapoet.TypeName
 import com.squareup.javapoet.TypeSpec
+import com.squareup.javapoet.TypeVariableName
 import java.io.IOException
 import java.util.*
 import javax.annotation.processing.AbstractProcessor
@@ -19,7 +21,10 @@ import javax.lang.model.element.ElementKind
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.Modifier
 import javax.lang.model.element.TypeElement
+import javax.lang.model.element.VariableElement
+import javax.lang.model.type.DeclaredType
 import javax.lang.model.util.Elements
+import javax.lang.model.util.Types
 import javax.tools.Diagnostic
 
 class Processor : AbstractProcessor() {
@@ -71,9 +76,11 @@ class Processor : AbstractProcessor() {
 
     private fun generateBodyOfClass(typeElement: TypeElement, classBuilder: TypeSpec.Builder) {
         val enclosedElements = typeElement.enclosedElements
-        enclosedElements.forEachIndexed { index, element ->
-            if (ElementKind.CONSTRUCTOR == element.kind) {
+        enclosedElements.forEach { element ->
+            if (element.kind == ElementKind.CONSTRUCTOR) {
                 generateConstructor(element, classBuilder)
+            } else if (element.kind == ElementKind.FIELD) {
+                generateDSLs(element, classBuilder)
             }
         }
     }
@@ -86,11 +93,10 @@ class Processor : AbstractProcessor() {
             addModifiers(constructor.modifiers)
             val superCall = StringBuilder("super(")
             constructorParameters.forEachIndexed { index, variableElement ->
-                val modifiers = variableElement.modifiers
                 addParameter(
                     TypeName.get(variableElement.asType()),
                     variableElement.simpleName.toString(),
-                    *modifiers.toTypedArray()
+                    *variableElement.modifiers.toTypedArray()
                 )
                 superCall.append(variableElement.simpleName.toString())
                 if (index < constructorParameters.size - 1) {
@@ -101,6 +107,93 @@ class Processor : AbstractProcessor() {
             addCode(superCall.toString())
         }
         classBuilder.addMethod(constructorBuilder.build())
+    }
+
+    private fun generateDSLs(element: Element, classBuilder: TypeSpec.Builder) {
+        val variable = element as VariableElement
+        val variableName = variable.simpleName.toString()
+        val liveData = variable.getAnnotation(LiveData::class.java)
+        if (liveData != null) {
+            val observerGenerics = generateObserverGenerics(variable)
+            val functionOneGenerics = generateFunctionOneGenerics(observerGenerics)
+            val liveDataFieldName = "get${variableName.substring(0, 1)
+                .toUpperCase()}${variableName.substring(1)}"
+            val observer = ClassName.get("android.arch.lifecycle", "Observer")
+            val liveDataObservationCode = generateLiveDataObservationCode(
+                liveDataFieldName,
+                observerGenerics,
+                observer
+            )
+            generateDSLFunction(
+                variableName,
+                functionOneGenerics,
+                liveDataObservationCode,
+                classBuilder
+            )
+        }
+    }
+
+    private fun generateObserverGenerics(variable: VariableElement): String {
+        val generics = StringBuilder()
+        if (variable.asType() is DeclaredType) {
+            val declaredType = variable.asType() as DeclaredType
+            declaredType.enclosingType
+            val typeArguments = declaredType.typeArguments
+            typeArguments.forEachIndexed { index, typeMirror ->
+                generics.append(typeMirror.toString())
+                if (index < typeArguments.size - 1) {
+                    generics.append(", ")
+                }
+            }
+        }
+        return generics.toString()
+    }
+
+    private fun generateLiveDataObservationCode(
+        liveDataFieldName: String,
+        observerGenerics: String,
+        observer: ClassName
+    ): CodeBlock {
+        return CodeBlock.builder()
+            .add(
+                "$liveDataFieldName().observe(lifecycleOwner, new \$T<$observerGenerics>(){" +
+                        "@Override public void onChanged($observerGenerics param) {function.invoke(param);}" +
+                        "});",
+                observer
+            )
+            .build()
+    }
+
+    private fun generateFunctionOneGenerics(observerGenerics: String): String {
+        val generics = StringBuilder()
+        if (observerGenerics.isEmpty()) {
+            generics.append("kotlin.Unit, kotlin.Unit")
+        } else {
+            generics.append("$observerGenerics, kotlin.Unit")
+        }
+        return generics.toString()
+    }
+
+    private fun generateDSLFunction(
+        variableName: String,
+        functionOneGenerics: String,
+        liveDataObservationCode: CodeBlock,
+        classBuilder: TypeSpec.Builder
+    ) {
+        val functionOne = ClassName.get("kotlin.jvm.functions", "Function1")
+        val lifecycleOwner = ClassName.get("android.arch.lifecycle", "LifecycleOwner")
+
+        val dslMethod = MethodSpec.methodBuilder(variableName).apply {
+            addModifiers(Modifier.PUBLIC)
+            addParameter(lifecycleOwner, "lifecycleOwner")
+            addParameter(
+                TypeVariableName.get("final ${functionOne.packageName()}.${functionOne.simpleName()}<$functionOneGenerics>"),
+                "function"
+            )
+            addCode(liveDataObservationCode)
+        }
+
+        classBuilder.addMethod(dslMethod.build())
     }
 
     private fun getTypeElements(
