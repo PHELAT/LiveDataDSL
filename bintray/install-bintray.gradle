@@ -1,0 +1,40 @@
+apply plugin: 'com.github.dcendents.android-maven'
+
+group = 'com.phelat'
+
+install {
+    repositories.mavenInstaller {
+        pom {
+            project {
+                packaging 'aar'
+                groupId 'com.phelat'
+                artifactId project.artifactId
+
+                name project.repoName
+                description 'Generates view-side DSL for android architecture component\'s LiveData'
+                url 'https://github.com/PHELAT/LiveDataDSL'
+
+                licenses {
+                    license {
+                        name 'The Apache Software License, Version 2.0'
+                        url 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id 'm4hdi'
+                        name 'Mahdi Nouri'
+                        email 'm4hdi.pdroid@gmail.com'
+                    }
+                }
+
+                scm {
+                    connection 'https://github.com/PHELAT/LiveDataDSL.git'
+                    developerConnection 'https://github.com/PHELAT/LiveDataDSL.git'
+                    url 'https://github.com/PHELAT/LiveDataDSL'
+                }
+            }
+        }
+    }
+}
