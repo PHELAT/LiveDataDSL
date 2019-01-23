@@ -59,7 +59,7 @@ sampleViewModel.apply{
 ## Dependency
 ```groovy
 dependencies {
-    implementation "com.phelat:livedatadsl:1.0.0-alpha2"
-    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha2"
+    implementation "com.phelat:livedatadsl:1.0.0-alpha3"
+    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha3"
 }
 ```
