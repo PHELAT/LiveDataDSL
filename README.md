@@ -1,5 +1,5 @@
 # LiveDataDSL
-Generates observe DSL for android architecture component's LiveData.
+Generates higher order function for LiveData observation.
 ```kotlin
 loginViewModel.apply {
     mySampleLiveData { userName ->
