@@ -1,5 +1,5 @@
 # LiveDataDSL
-Generates observe DSL for android architecture component's LiveData.
+Generates higher order function for LiveData observation.
 ```kotlin
 loginViewModel.apply {
     mySampleLiveData { userName ->
@@ -59,7 +59,7 @@ sampleViewModel.apply{
 ## Dependency
 ```groovy
 dependencies {
-    implementation "com.phelat:livedatadsl:1.0.0-alpha1"
-    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha1"
+    implementation "com.phelat:livedatadsl:1.0.0-alpha2"
+    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha2"
 }
 ```
