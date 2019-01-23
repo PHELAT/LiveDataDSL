@@ -1,1 +1,1 @@
-include ':app', ':livedatadsl-annotation', ':livedatadsl-processor'
+include ':app', ':livedatadsl', ':livedatadsl-processor'
