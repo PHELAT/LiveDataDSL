@@ -5,6 +5,7 @@ import com.squareup.javapoet.ClassName
 import com.squareup.javapoet.CodeBlock
 import com.squareup.javapoet.JavaFile
 import com.squareup.javapoet.MethodSpec
+import com.squareup.javapoet.ParameterizedTypeName
 import com.squareup.javapoet.TypeName
 import com.squareup.javapoet.TypeSpec
 import com.squareup.javapoet.TypeVariableName
@@ -23,6 +24,7 @@ import javax.lang.model.element.Modifier
 import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.lang.model.type.DeclaredType
+import javax.lang.model.type.TypeMirror
 import javax.lang.model.util.Elements
 import javax.tools.Diagnostic
 
@@ -113,51 +115,67 @@ class Processor : AbstractProcessor() {
         val variableName = variable.simpleName.toString()
         val liveData = variable.getAnnotation(LiveDataDSL::class.java)
         if (liveData != null) {
-            val observerGenerics = generateObserverGenerics(variable)
-            val functionOneGenerics = generateFunctionOneGenerics(observerGenerics)
-            val liveDataFieldName = "get${variableName.substring(0, 1)
-                .toUpperCase()}${variableName.substring(1)}"
-            val observer = ClassName.get(getLifeCyclePackage(), "Observer")
-            val liveDataObservationCode = generateLiveDataObservationCode(
-                liveDataFieldName,
-                observerGenerics,
-                observer
-            )
-            val liveDataObserveForEverCode = generateLiveDataObserveForEverCode(
-                liveDataFieldName,
-                observerGenerics,
-                observer
-            )
-            generateDSLFunction(
-                variableName,
-                functionOneGenerics,
-                liveDataObservationCode,
-                liveDataObserveForEverCode,
-                classBuilder
-            )
+            if (variable.asType() is DeclaredType) {
+                val declaredType = variable.asType() as DeclaredType
+                val mutableLiveData = getMutableLiveData(declaredType)
+                val mutableLiveDataGenerics = mutableLiveData.typeArguments
+                val observerGenerics = generateObserverGenerics(mutableLiveDataGenerics)
+                val liveDataGenerics = generateLiveDataGenerics(mutableLiveDataGenerics)
+                val functionOneGenerics = generateFunctionOneGenerics(observerGenerics)
+
+                val liveDataFieldName = "get${variableName.substring(0, 1)
+                    .toUpperCase()}${variableName.substring(1)}"
+                val observer = ClassName.get(getLifeCyclePackage(), "Observer")
+                val liveDataObservationCode = generateLiveDataObservationCode(
+                    liveDataFieldName,
+                    observerGenerics,
+                    observer
+                )
+                val liveDataObserveForEverCode = generateLiveDataObserveForEverCode(
+                    liveDataFieldName,
+                    observerGenerics,
+                    observer
+                )
+
+                generateDSLFunction(
+                    variableName,
+                    functionOneGenerics,
+                    liveDataGenerics,
+                    liveDataObservationCode,
+                    liveDataObserveForEverCode,
+                    classBuilder
+                )
+            }
         }
     }
 
-    private fun generateObserverGenerics(variable: VariableElement): String {
+    private fun generateObserverGenerics(typeArguments: List<TypeMirror>): String {
         val generics = StringBuilder()
-        if (variable.asType() is DeclaredType) {
-            val declaredType = variable.asType() as DeclaredType
-            val mutableLiveData = getMutableLiveData(declaredType)
-            val typeArguments = mutableLiveData.typeArguments
-            typeArguments.forEachIndexed { index, typeMirror ->
-                generics.append(typeMirror.toString())
-                if (index < typeArguments.size - 1) {
-                    generics.append(", ")
-                }
+        typeArguments.forEachIndexed { index, typeMirror ->
+            generics.append(typeMirror.toString())
+            if (index < typeArguments.size - 1) {
+                generics.append(", ")
             }
         }
         return generics.toString()
     }
 
+    private fun generateLiveDataGenerics(typeArguments: List<TypeMirror>): List<TypeName> {
+        val generics = mutableListOf<TypeName>()
+        typeArguments.forEach { typeMirror ->
+            val declaredType = typeMirror as DeclaredType
+            val typeElement = declaredType.asElement() as TypeElement
+            val packageName = elementUtils.getPackageOf(typeElement).qualifiedName
+            val typeName = declaredType.asElement().simpleName
+            val genericClassName = ClassName.get(packageName.toString(), typeName.toString())
+            generics.add(genericClassName.box())
+        }
+        return generics
+    }
+
     private fun getMutableLiveData(declaredType: DeclaredType): DeclaredType {
         val typeElement = declaredType.asElement() as TypeElement
-        val packageName = elementUtils.getPackageOf(typeElement)
-            .qualifiedName
+        val packageName = elementUtils.getPackageOf(typeElement).qualifiedName
         val variableTypeName = declaredType.asElement().simpleName
         val isPackageArch = packageName.contentEquals(getLifeCyclePackage())
         val isClassLiveData = variableTypeName.contentEquals("MutableLiveData")
@@ -180,6 +198,7 @@ class Processor : AbstractProcessor() {
                         "});",
                 observer
             )
+            .add("return $liveDataFieldName();")
             .build()
     }
 
@@ -195,6 +214,7 @@ class Processor : AbstractProcessor() {
                         "});",
                 observer
             )
+            .add("return $liveDataFieldName();")
             .build()
     }
 
@@ -211,15 +231,18 @@ class Processor : AbstractProcessor() {
     private fun generateDSLFunction(
         variableName: String,
         functionOneGenerics: String,
+        liveDataGenerics: List<TypeName>,
         liveDataObservationCode: CodeBlock,
         liveDataObserveForEverCode: CodeBlock,
         classBuilder: TypeSpec.Builder
     ) {
         val functionOne = ClassName.get("kotlin.jvm.functions", "Function1")
         val lifecycleOwner = ClassName.get(getLifeCyclePackage(), "LifecycleOwner")
+        val liveData = ClassName.get(getLifeCyclePackage(), "LiveData")
 
         val dslWithLifeCycle = MethodSpec.methodBuilder(variableName).apply {
             addModifiers(Modifier.PUBLIC)
+            returns(ParameterizedTypeName.get(liveData, *liveDataGenerics.toTypedArray()))
             addParameter(lifecycleOwner, "lifecycleOwner")
             addParameter(
                 TypeVariableName.get("final ${functionOne.packageName()}.${functionOne.simpleName()}<$functionOneGenerics>"),
@@ -230,6 +253,7 @@ class Processor : AbstractProcessor() {
 
         val dslWithoutLifeCycle = MethodSpec.methodBuilder(variableName).apply {
             addModifiers(Modifier.PUBLIC)
+            returns(ParameterizedTypeName.get(liveData, *liveDataGenerics.toTypedArray()))
             addParameter(
                 TypeVariableName.get("final ${functionOne.packageName()}.${functionOne.simpleName()}<$functionOneGenerics>"),
                 "function"
