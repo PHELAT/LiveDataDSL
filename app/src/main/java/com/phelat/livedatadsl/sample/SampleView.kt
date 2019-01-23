@@ -12,6 +12,9 @@ class SampleView : AppCompatActivity() {
             sampleLiveData(this@SampleView) {
                 println("I'm a string $it")
             }
+            sampleLiveData {
+                println("I'm a string $it")
+            }
             sampleLiveDataInt(this@SampleView) {
                 println("I'm an integer ${it + 2}")
             }

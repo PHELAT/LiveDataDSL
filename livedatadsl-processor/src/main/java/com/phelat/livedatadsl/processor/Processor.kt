@@ -123,10 +123,16 @@ class Processor : AbstractProcessor() {
                 observerGenerics,
                 observer
             )
+            val liveDataObserveForEverCode = generateLiveDataObserveForEverCode(
+                liveDataFieldName,
+                observerGenerics,
+                observer
+            )
             generateDSLFunction(
                 variableName,
                 functionOneGenerics,
                 liveDataObservationCode,
+                liveDataObserveForEverCode,
                 classBuilder
             )
         }
@@ -177,6 +183,21 @@ class Processor : AbstractProcessor() {
             .build()
     }
 
+    private fun generateLiveDataObserveForEverCode(
+        liveDataFieldName: String,
+        observerGenerics: String,
+        observer: ClassName
+    ): CodeBlock {
+        return CodeBlock.builder()
+            .add(
+                "$liveDataFieldName().observeForever(new \$T<$observerGenerics>(){" +
+                        "@Override public void onChanged($observerGenerics param) {function.invoke(param);}" +
+                        "});",
+                observer
+            )
+            .build()
+    }
+
     private fun generateFunctionOneGenerics(observerGenerics: String): String {
         val generics = StringBuilder()
         if (observerGenerics.isEmpty()) {
@@ -191,12 +212,13 @@ class Processor : AbstractProcessor() {
         variableName: String,
         functionOneGenerics: String,
         liveDataObservationCode: CodeBlock,
+        liveDataObserveForEverCode: CodeBlock,
         classBuilder: TypeSpec.Builder
     ) {
         val functionOne = ClassName.get("kotlin.jvm.functions", "Function1")
         val lifecycleOwner = ClassName.get(getLifeCyclePackage(), "LifecycleOwner")
 
-        val dslMethod = MethodSpec.methodBuilder(variableName).apply {
+        val dslWithLifeCycle = MethodSpec.methodBuilder(variableName).apply {
             addModifiers(Modifier.PUBLIC)
             addParameter(lifecycleOwner, "lifecycleOwner")
             addParameter(
@@ -206,7 +228,17 @@ class Processor : AbstractProcessor() {
             addCode(liveDataObservationCode)
         }
 
-        classBuilder.addMethod(dslMethod.build())
+        val dslWithoutLifeCycle = MethodSpec.methodBuilder(variableName).apply {
+            addModifiers(Modifier.PUBLIC)
+            addParameter(
+                TypeVariableName.get("final ${functionOne.packageName()}.${functionOne.simpleName()}<$functionOneGenerics>"),
+                "function"
+            )
+            addCode(liveDataObserveForEverCode)
+        }
+
+        classBuilder.addMethod(dslWithLifeCycle.build())
+        classBuilder.addMethod(dslWithoutLifeCycle.build())
     }
 
     private fun getTypeElements(
