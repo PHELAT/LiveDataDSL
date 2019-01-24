@@ -113,36 +113,50 @@ class Processor : AbstractProcessor() {
     private fun generateDSLs(element: Element, classBuilder: TypeSpec.Builder) {
         val variable = element as VariableElement
         val variableName = variable.simpleName.toString()
-        val liveData = variable.getAnnotation(LiveDataDSL::class.java)
-        if (liveData != null) {
+        val liveDataAnnotation = variable.getAnnotation(LiveDataDSL::class.java)
+        if (liveDataAnnotation != null) {
             if (variable.asType() is DeclaredType) {
                 val declaredType = variable.asType() as DeclaredType
                 val mutableLiveData = getMutableLiveData(declaredType)
                 val mutableLiveDataGenerics = mutableLiveData.typeArguments
                 val observerGenerics = generateObserverGenerics(mutableLiveDataGenerics)
-                val liveDataGenerics = generateLiveDataGenerics(mutableLiveDataGenerics)
+                val liveDataGenerics = getGenericTypeNames(mutableLiveDataGenerics)
                 val functionOneGenerics = generateFunctionOneGenerics(observerGenerics)
 
                 val liveDataFieldName = "get${variableName.substring(0, 1)
                     .toUpperCase()}${variableName.substring(1)}"
                 val observer = ClassName.get(getLifeCyclePackage(), "Observer")
+
+                val rawLiveData = ClassName.get(getLifeCyclePackage(), "LiveData")
+                val liveData = ParameterizedTypeName.get(
+                    rawLiveData,
+                    *liveDataGenerics.toTypedArray()
+                )
+
+                val rawPair = ClassName.get("kotlin", "Pair")
+
                 val liveDataObservationCode = generateLiveDataObservationCode(
                     liveDataFieldName,
                     observerGenerics,
-                    observer
+                    observer,
+                    rawPair
                 )
                 val liveDataObserveForEverCode = generateLiveDataObserveForEverCode(
                     liveDataFieldName,
                     observerGenerics,
-                    observer
+                    observer,
+                    rawPair
                 )
 
                 generateDSLFunction(
                     variableName,
                     functionOneGenerics,
-                    liveDataGenerics,
+                    liveData,
                     liveDataObservationCode,
                     liveDataObserveForEverCode,
+                    liveDataGenerics,
+                    observer,
+                    rawPair,
                     classBuilder
                 )
             }
@@ -160,7 +174,7 @@ class Processor : AbstractProcessor() {
         return generics.toString()
     }
 
-    private fun generateLiveDataGenerics(typeArguments: List<TypeMirror>): List<TypeName> {
+    private fun getGenericTypeNames(typeArguments: List<TypeMirror>): List<TypeName> {
         val generics = mutableListOf<TypeName>()
         typeArguments.forEach { typeMirror ->
             val declaredType = typeMirror as DeclaredType
@@ -189,32 +203,40 @@ class Processor : AbstractProcessor() {
     private fun generateLiveDataObservationCode(
         liveDataFieldName: String,
         observerGenerics: String,
-        observer: ClassName
+        observer: ClassName,
+        rawPair: ClassName
     ): CodeBlock {
         return CodeBlock.builder()
             .add(
-                "$liveDataFieldName().observe(lifecycleOwner, new \$T<$observerGenerics>(){" +
+                "\$T observer = new \$T<$observerGenerics>(){" +
                         "@Override public void onChanged($observerGenerics param) {function.invoke(param);}" +
-                        "});",
-                observer
+                        "};",
+                observer, observer
             )
-            .add("return $liveDataFieldName();")
+            .add(
+                "$liveDataFieldName().observe(lifecycleOwner, observer);"
+            )
+            .add("return new \$T(observer, $liveDataFieldName());", rawPair)
             .build()
     }
 
     private fun generateLiveDataObserveForEverCode(
         liveDataFieldName: String,
         observerGenerics: String,
-        observer: ClassName
+        observer: ClassName,
+        rawPair: ClassName
     ): CodeBlock {
         return CodeBlock.builder()
             .add(
-                "$liveDataFieldName().observeForever(new \$T<$observerGenerics>(){" +
+                "\$T observer = new \$T<$observerGenerics>(){" +
                         "@Override public void onChanged($observerGenerics param) {function.invoke(param);}" +
-                        "});",
-                observer
+                        "};",
+                observer, observer
             )
-            .add("return $liveDataFieldName();")
+            .add(
+                "$liveDataFieldName().observeForever(observer);"
+            )
+            .add("return new \$T(observer, $liveDataFieldName());", rawPair)
             .build()
     }
 
@@ -231,18 +253,23 @@ class Processor : AbstractProcessor() {
     private fun generateDSLFunction(
         variableName: String,
         functionOneGenerics: String,
-        liveDataGenerics: List<TypeName>,
+        liveData: ParameterizedTypeName,
         liveDataObservationCode: CodeBlock,
         liveDataObserveForEverCode: CodeBlock,
+        observerGenerics: List<TypeName>,
+        rawObserver: ClassName,
+        rawPair: ClassName,
         classBuilder: TypeSpec.Builder
     ) {
         val functionOne = ClassName.get("kotlin.jvm.functions", "Function1")
         val lifecycleOwner = ClassName.get(getLifeCyclePackage(), "LifecycleOwner")
-        val liveData = ClassName.get(getLifeCyclePackage(), "LiveData")
+
+        val observer = ParameterizedTypeName.get(rawObserver, *observerGenerics.toTypedArray())
+        val pair = ParameterizedTypeName.get(rawPair, observer.box(), liveData.box())
 
         val dslWithLifeCycle = MethodSpec.methodBuilder(variableName).apply {
             addModifiers(Modifier.PUBLIC)
-            returns(ParameterizedTypeName.get(liveData, *liveDataGenerics.toTypedArray()))
+            returns(pair)
             addParameter(lifecycleOwner, "lifecycleOwner")
             addParameter(
                 TypeVariableName.get("final ${functionOne.packageName()}.${functionOne.simpleName()}<$functionOneGenerics>"),
@@ -253,7 +280,7 @@ class Processor : AbstractProcessor() {
 
         val dslWithoutLifeCycle = MethodSpec.methodBuilder(variableName).apply {
             addModifiers(Modifier.PUBLIC)
-            returns(ParameterizedTypeName.get(liveData, *liveDataGenerics.toTypedArray()))
+            returns(pair)
             addParameter(
                 TypeVariableName.get("final ${functionOne.packageName()}.${functionOne.simpleName()}<$functionOneGenerics>"),
                 "function"
