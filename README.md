@@ -1,13 +1,13 @@
 # LiveDataDSL
-Generates higher order function for LiveData observation.
+Generates DSL for LiveData observation.
 ```kotlin
 loginViewModel.apply {
-    mySampleLiveData { userName ->
+    mySampleLiveData(this@MainActivity) { userName ->
         println(userName)
         ...
     }
-    myOtherLiveData {
-        println(it)
+    liveDataWithoutLifeCycleOwner { userName ->
+        println(userName)
         ...
     }
 }
@@ -45,6 +45,21 @@ The generated ViewModel will be named `${ORIGINAL_CLASS_NAME}_DSL.kt`, for examp
 ```kotlin
 val sampleViewModel = ViewModelProviders.of(this)[SampleViewModel_DSL::class.java]
 sampleViewModel.apply{
+    sampleLiveData(this@MainActivity) {
+        // This is where observation happens, you can use `it` receiver as observed value
+        ...
+    }
+    myOtherLiveData(this@MainActivity) { myValue ->
+        // This is where observation happens, you can use `myValue` receiver as observed value
+        ...
+    }
+}
+```
+### Observe without LifecycleOwner
+You can also observe your live data without passing LifecycleOwner, but it will use `observeForever`.
+```kotlin
+val sampleViewModel = ViewModelProviders.of(this)[SampleViewModel_DSL::class.java]
+sampleViewModel.apply{
     sampleLiveData {
         // This is where observation happens, you can use `it` receiver as observed value
         ...
@@ -59,7 +74,7 @@ sampleViewModel.apply{
 ## Dependency
 ```groovy
 dependencies {
-    implementation "com.phelat:livedatadsl:1.0.0-alpha2"
-    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha2"
+    implementation "com.phelat:livedatadsl:1.0.0-alpha3"
+    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha3"
 }
 ```
