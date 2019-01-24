@@ -133,19 +133,22 @@ class Processor : AbstractProcessor() {
                     *liveDataGenerics.toTypedArray()
                 )
 
-                val rawPair = ClassName.get("kotlin", "Pair")
+                val rawFunctionResult = ClassName.get(
+                    "com.phelat.livedatadsl.model",
+                    "FunctionResult"
+                )
 
                 val liveDataObservationCode = generateLiveDataObservationCode(
                     liveDataFieldName,
                     observerGenerics,
                     observer,
-                    rawPair
+                    rawFunctionResult
                 )
                 val liveDataObserveForEverCode = generateLiveDataObserveForEverCode(
                     liveDataFieldName,
                     observerGenerics,
                     observer,
-                    rawPair
+                    rawFunctionResult
                 )
 
                 generateDSLFunction(
@@ -156,7 +159,7 @@ class Processor : AbstractProcessor() {
                     liveDataObserveForEverCode,
                     liveDataGenerics,
                     observer,
-                    rawPair,
+                    rawFunctionResult,
                     classBuilder
                 )
             }
@@ -204,7 +207,7 @@ class Processor : AbstractProcessor() {
         liveDataFieldName: String,
         observerGenerics: String,
         observer: ClassName,
-        rawPair: ClassName
+        rawFunctionResult: ClassName
     ): CodeBlock {
         return CodeBlock.builder()
             .add(
@@ -216,7 +219,7 @@ class Processor : AbstractProcessor() {
             .add(
                 "$liveDataFieldName().observe(lifecycleOwner, observer);"
             )
-            .add("return new \$T(observer, $liveDataFieldName());", rawPair)
+            .add("return new \$T(observer, $liveDataFieldName());", rawFunctionResult)
             .build()
     }
 
@@ -224,7 +227,7 @@ class Processor : AbstractProcessor() {
         liveDataFieldName: String,
         observerGenerics: String,
         observer: ClassName,
-        rawPair: ClassName
+        rawFunctionResult: ClassName
     ): CodeBlock {
         return CodeBlock.builder()
             .add(
@@ -236,7 +239,7 @@ class Processor : AbstractProcessor() {
             .add(
                 "$liveDataFieldName().observeForever(observer);"
             )
-            .add("return new \$T(observer, $liveDataFieldName());", rawPair)
+            .add("return new \$T(observer, $liveDataFieldName());", rawFunctionResult)
             .build()
     }
 
@@ -258,18 +261,18 @@ class Processor : AbstractProcessor() {
         liveDataObserveForEverCode: CodeBlock,
         observerGenerics: List<TypeName>,
         rawObserver: ClassName,
-        rawPair: ClassName,
+        rawFunctionResult: ClassName,
         classBuilder: TypeSpec.Builder
     ) {
         val functionOne = ClassName.get("kotlin.jvm.functions", "Function1")
         val lifecycleOwner = ClassName.get(getLifeCyclePackage(), "LifecycleOwner")
 
         val observer = ParameterizedTypeName.get(rawObserver, *observerGenerics.toTypedArray())
-        val pair = ParameterizedTypeName.get(rawPair, observer.box(), liveData.box())
+        val functionResult = ParameterizedTypeName.get(rawFunctionResult, observer.box(), liveData.box())
 
         val dslWithLifeCycle = MethodSpec.methodBuilder(variableName).apply {
             addModifiers(Modifier.PUBLIC)
-            returns(pair)
+            returns(functionResult)
             addParameter(lifecycleOwner, "lifecycleOwner")
             addParameter(
                 TypeVariableName.get("final ${functionOne.packageName()}.${functionOne.simpleName()}<$functionOneGenerics>"),
@@ -280,7 +283,7 @@ class Processor : AbstractProcessor() {
 
         val dslWithoutLifeCycle = MethodSpec.methodBuilder(variableName).apply {
             addModifiers(Modifier.PUBLIC)
-            returns(pair)
+            returns(functionResult)
             addParameter(
                 TypeVariableName.get("final ${functionOne.packageName()}.${functionOne.simpleName()}<$functionOneGenerics>"),
                 "function"

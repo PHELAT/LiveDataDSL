@@ -1,10 +1,15 @@
 package com.phelat.livedatadsl.sample
 
+import android.arch.lifecycle.LiveData
+import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
+import com.phelat.livedatadsl.model.FunctionResult
 
 class SampleView : AppCompatActivity() {
+
+    private lateinit var functionResult: FunctionResult<Observer<String>, LiveData<String>>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -12,7 +17,7 @@ class SampleView : AppCompatActivity() {
             sampleLiveData(this@SampleView) {
                 println("I'm a string $it")
             }
-            sampleLiveData {
+            functionResult = sampleLiveData {
                 println("I'm a string $it")
             }
             sampleLiveDataInt(this@SampleView) {
@@ -22,6 +27,11 @@ class SampleView : AppCompatActivity() {
                 println("I'm a boolean and I'm $it")
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        functionResult.apply { liveData.removeObserver(observer) }
     }
 
 }
