@@ -79,11 +79,25 @@ override fun onDestroy() {
     function.apply { liveData.removeObservers(observer) }
 }
 ```
+### Custom name for DSL function
+You can set custom name for the DSL function through `@LiveData(name = "customName")`.
+```kotlin
+open class SampleViewModel : ViewModel() {
+    @LiveData("helloWorld")
+    protected val customLiveData = MutableLiveData<Any>()
+}
+
+val sampleViewModel = ViewModelProviders.of(this)[SampleViewModel_DSL::class.java].apply {
+    helloWorld {
+        ...
+    }
+}
+```
 
 ## Dependency
 ```groovy
 dependencies {
-    implementation "com.phelat:livedatadsl:1.0.0-alpha4"
-    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha4"
+    implementation "com.phelat:livedatadsl:1.0.0-alpha5"
+    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha5"
 }
 ```
