@@ -15,6 +15,9 @@ open class SampleViewModel : ViewModel() {
     @LiveDataDSL
     protected val extendedLiveDataSample = ExtendedLiveData()
 
+    @LiveDataDSL("helloWorld")
+    protected val liveDataWithCustomName = MutableLiveData<Long>()
+
     class ExtendedLiveData : MutableLiveData<Boolean>()
 
 }

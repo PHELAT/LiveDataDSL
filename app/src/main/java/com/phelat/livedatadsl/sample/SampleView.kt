@@ -26,6 +26,9 @@ class SampleView : AppCompatActivity() {
             extendedLiveDataSample(this@SampleView) {
                 println("I'm a boolean and I'm $it")
             }
+            helloWorld {
+                println("Hello World!")
+            }
         }
     }
 

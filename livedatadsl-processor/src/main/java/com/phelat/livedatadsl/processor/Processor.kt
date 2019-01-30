@@ -125,9 +125,9 @@ class Processor : AbstractProcessor() {
 
                 val liveDataFieldName = "get${variableName.substring(0, 1)
                     .toUpperCase()}${variableName.substring(1)}"
-                val observer = ClassName.get(getLifeCyclePackage(), "Observer")
+                val observer = ClassName.get(LIFE_CYCLE_PACKAGE, "Observer")
 
-                val rawLiveData = ClassName.get(getLifeCyclePackage(), "LiveData")
+                val rawLiveData = ClassName.get(LIFE_CYCLE_PACKAGE, "LiveData")
                 val liveData = ParameterizedTypeName.get(
                     rawLiveData,
                     *liveDataGenerics.toTypedArray()
@@ -152,7 +152,7 @@ class Processor : AbstractProcessor() {
                 )
 
                 generateDSLFunction(
-                    variableName,
+                    if (liveDataAnnotation.name.isBlank()) variableName else liveDataAnnotation.name,
                     functionOneGenerics,
                     liveData,
                     liveDataObservationCode,
@@ -194,7 +194,7 @@ class Processor : AbstractProcessor() {
         val typeElement = declaredType.asElement() as TypeElement
         val packageName = elementUtils.getPackageOf(typeElement).qualifiedName
         val variableTypeName = declaredType.asElement().simpleName
-        val isPackageArch = packageName.contentEquals(getLifeCyclePackage())
+        val isPackageArch = packageName.contentEquals(LIFE_CYCLE_PACKAGE)
         val isClassLiveData = variableTypeName.contentEquals("MutableLiveData")
         return if (isPackageArch && isClassLiveData) {
             declaredType
@@ -265,10 +265,14 @@ class Processor : AbstractProcessor() {
         classBuilder: TypeSpec.Builder
     ) {
         val functionOne = ClassName.get("kotlin.jvm.functions", "Function1")
-        val lifecycleOwner = ClassName.get(getLifeCyclePackage(), "LifecycleOwner")
+        val lifecycleOwner = ClassName.get(LIFE_CYCLE_PACKAGE, "LifecycleOwner")
 
         val observer = ParameterizedTypeName.get(rawObserver, *observerGenerics.toTypedArray())
-        val functionResult = ParameterizedTypeName.get(rawFunctionResult, observer.box(), liveData.box())
+        val functionResult = ParameterizedTypeName.get(
+            rawFunctionResult,
+            observer.box(),
+            liveData.box()
+        )
 
         val dslWithLifeCycle = MethodSpec.methodBuilder(variableName).apply {
             addModifiers(Modifier.PUBLIC)
@@ -348,12 +352,7 @@ class Processor : AbstractProcessor() {
         return setOf(LiveDataDSL::class.java.canonicalName)
     }
 
-    private fun getLifeCyclePackage(): String {
-        return if (ANDROID_X) LIFE_CYCLE_PACKAGE_X else LIFE_CYCLE_PACKAGE
-    }
-
     companion object {
-        const val ANDROID_X = false
         const val LIFE_CYCLE_PACKAGE = "android.arch.lifecycle"
         const val LIFE_CYCLE_PACKAGE_X = "androidx.lifecycle"
     }
