@@ -121,7 +121,7 @@ class Processor : AbstractProcessor() {
                 val mutableLiveDataGenerics = mutableLiveData.typeArguments
                 val observerGenerics = generateObserverGenerics(mutableLiveDataGenerics)
                 val liveDataGenerics = getGenericTypeNames(mutableLiveDataGenerics)
-                val functionOneGenerics = generateFunctionOneGenerics(observerGenerics)
+                val functionGenerics = generateFunctionGenerics(observerGenerics)
 
                 val liveDataFieldName = "get${variableName.substring(0, 1)
                     .toUpperCase()}${variableName.substring(1)}"
@@ -153,7 +153,7 @@ class Processor : AbstractProcessor() {
 
                 generateDSLFunction(
                     if (liveDataAnnotation.name.isBlank()) variableName else liveDataAnnotation.name,
-                    functionOneGenerics,
+                    functionGenerics,
                     liveData,
                     liveDataObservationCode,
                     liveDataObserveForEverCode,
@@ -212,7 +212,7 @@ class Processor : AbstractProcessor() {
         return CodeBlock.builder()
             .add(
                 "\$T observer = new \$T<$observerGenerics>(){" +
-                        "@Override public void onChanged($observerGenerics param) {function.invoke(param);}" +
+                        "@Override public void onChanged($observerGenerics param) {function.invoke(${if (observerGenerics == "kotlin.Unit") ")" else "param)"};}" +
                         "};",
                 observer, observer
             )
@@ -232,7 +232,7 @@ class Processor : AbstractProcessor() {
         return CodeBlock.builder()
             .add(
                 "\$T observer = new \$T<$observerGenerics>(){" +
-                        "@Override public void onChanged($observerGenerics param) {function.invoke(param);}" +
+                        "@Override public void onChanged($observerGenerics param) {function.invoke(${if (observerGenerics == "kotlin.Unit") ")" else "param)"};}" +
                         "};",
                 observer, observer
             )
@@ -243,10 +243,10 @@ class Processor : AbstractProcessor() {
             .build()
     }
 
-    private fun generateFunctionOneGenerics(observerGenerics: String): String {
+    private fun generateFunctionGenerics(observerGenerics: String): String {
         val generics = StringBuilder()
-        if (observerGenerics.isEmpty()) {
-            generics.append("kotlin.Unit, kotlin.Unit")
+        if (observerGenerics.isEmpty() || observerGenerics == "kotlin.Unit") {
+            generics.append("kotlin.Unit")
         } else {
             generics.append("$observerGenerics, kotlin.Unit")
         }
@@ -255,7 +255,7 @@ class Processor : AbstractProcessor() {
 
     private fun generateDSLFunction(
         variableName: String,
-        functionOneGenerics: String,
+        functionGenerics: String,
         liveData: ParameterizedTypeName,
         liveDataObservationCode: CodeBlock,
         liveDataObserveForEverCode: CodeBlock,
@@ -264,7 +264,10 @@ class Processor : AbstractProcessor() {
         rawFunctionResult: ClassName,
         classBuilder: TypeSpec.Builder
     ) {
-        val functionOne = ClassName.get("kotlin.jvm.functions", "Function1")
+        val function = ClassName.get(
+            "kotlin.jvm.functions",
+            if (functionGenerics == "kotlin.Unit") "Function0" else "Function1"
+        )
         val lifecycleOwner = ClassName.get(LIFE_CYCLE_PACKAGE, "LifecycleOwner")
 
         val observer = ParameterizedTypeName.get(rawObserver, *observerGenerics.toTypedArray())
@@ -279,7 +282,7 @@ class Processor : AbstractProcessor() {
             returns(functionResult)
             addParameter(lifecycleOwner, "lifecycleOwner")
             addParameter(
-                TypeVariableName.get("final ${functionOne.packageName()}.${functionOne.simpleName()}<$functionOneGenerics>"),
+                TypeVariableName.get("final ${function.packageName()}.${function.simpleName()}<$functionGenerics>"),
                 "function"
             )
             addCode(liveDataObservationCode)
@@ -289,7 +292,7 @@ class Processor : AbstractProcessor() {
             addModifiers(Modifier.PUBLIC)
             returns(functionResult)
             addParameter(
-                TypeVariableName.get("final ${functionOne.packageName()}.${functionOne.simpleName()}<$functionOneGenerics>"),
+                TypeVariableName.get("final ${function.packageName()}.${function.simpleName()}<$functionGenerics>"),
                 "function"
             )
             addCode(liveDataObserveForEverCode)

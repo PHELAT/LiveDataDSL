@@ -27,7 +27,10 @@ class SampleView : AppCompatActivity() {
                 println("I'm a boolean and I'm $it")
             }
             helloWorld {
-                println("Hello World!")
+                println("Hello World! $it")
+            }
+            liveDataWithoutReceiver {
+                println("Executed without receiver")
             }
         }
     }
