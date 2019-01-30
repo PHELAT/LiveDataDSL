@@ -58,23 +58,32 @@ sampleViewModel.apply{
 ### Observe without LifecycleOwner
 You can also observe your live data without passing LifecycleOwner, but it will use `observeForever`.
 ```kotlin
-val sampleViewModel = ViewModelProviders.of(this)[SampleViewModel_DSL::class.java]
-sampleViewModel.apply{
-    sampleLiveData {
-        // This is where observation happens, you can use `it` receiver as observed value
-        ...
+private lateinit var function: FunctionResult<Observer<String>, LiveData<String>>
+
+override fun onCreate(bundle: Bundle?) {
+    val sampleViewModel = ViewModelProviders.of(this)[SampleViewModel_DSL::class.java]
+    sampleViewModel.apply{
+        function = sampleLiveData {
+            // This is where observation happens, you can use `it` receiver as observed value
+            ...
+        }
+        myOtherLiveData { myValue ->
+            // This is where observation happens, you can use `myValue` receiver as observed value
+            ...
+        }
     }
-    myOtherLiveData { myValue ->
-        // This is where observation happens, you can use `myValue` receiver as observed value
-        ...
-    }
+}
+
+override fun onDestroy() {
+    super.onDestroy()
+    function.apply { liveData.removeObservers(observer) }
 }
 ```
 
 ## Dependency
 ```groovy
 dependencies {
-    implementation "com.phelat:livedatadsl:1.0.0-alpha3"
-    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha3"
+    implementation "com.phelat:livedatadsl:1.0.0-alpha4"
+    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha4"
 }
 ```
