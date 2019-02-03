@@ -2,8 +2,8 @@ apply plugin: 'java-library'
 apply plugin: 'kotlin'
 
 ext {
-    repoName = 'LiveDataDSL-Processor'
-    artifactId = 'livedatadsl-processor'
+    repoName = 'LiveDataDSL-Processor-Base'
+    artifactId = 'livedatadsl-processor-base'
 }
 
 dependencies {
@@ -14,7 +14,7 @@ dependencies {
 
     implementation 'com.squareup:javapoet:1.11.1'
 
-    compile project(':livedatadsl-processor-base')
+    api project(':livedatadsl')
 
 }
 
