@@ -198,7 +198,15 @@ abstract class BaseProcessor : AbstractProcessor() {
             val packageName = elementUtils.getPackageOf(typeElement).qualifiedName
             val typeName = declaredType.asElement().simpleName
             val genericClassName = ClassName.get(packageName.toString(), typeName.toString())
-            generics.add(genericClassName.box())
+            if (declaredType.typeArguments.isNotEmpty()) {
+                val parameterizedTypeName = ParameterizedTypeName.get(
+                    genericClassName,
+                    *getGenericTypeNames(declaredType.typeArguments).toTypedArray()
+                )
+                generics.add(parameterizedTypeName.box())
+            } else {
+                generics.add(genericClassName.box())
+            }
         }
         return generics
     }
@@ -207,7 +215,12 @@ abstract class BaseProcessor : AbstractProcessor() {
         val typeElement = declaredType.self.asElement() as TypeElement
         if (isDeclaredTypeLiveData(declaredType.self)) {
             val generics = getGenericTypeNames(declaredType.self.typeArguments)
-            val genericClass = generics[0].box() as ClassName
+            val rawGeneric = generics[0].box()
+            val genericClass = if (rawGeneric is ParameterizedTypeName) {
+                rawGeneric.rawType
+            } else {
+                rawGeneric as ClassName
+            }
             val isGenericNameObject = genericClass.simpleName() == "Object"
             val isGenericPackageObject = genericClass.packageName() == "java.lang"
             return if (isGenericNameObject && isGenericPackageObject && declaredType.son != null) {
@@ -247,7 +260,15 @@ abstract class BaseProcessor : AbstractProcessor() {
                         packageName.toString(),
                         typeName.toString()
                     )
-                    return listOf(sonGenericClassName)
+                    return if (sonGenericType.typeArguments.isNotEmpty()) {
+                        val parameterizedTypeName = ParameterizedTypeName.get(
+                            sonGenericClassName,
+                            *getGenericTypeNames(sonGenericType.typeArguments).toTypedArray()
+                        )
+                        listOf(parameterizedTypeName.box())
+                    } else {
+                        listOf(sonGenericClassName)
+                    }
                 }
             }
             return getGenericTypeFromSon(declaredType.son, genericName)
