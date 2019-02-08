@@ -97,7 +97,14 @@ val sampleViewModel = ViewModelProviders.of(this)[SampleViewModel_DSL::class.jav
 ## Dependency
 ```groovy
 dependencies {
-    implementation "com.phelat:livedatadsl:1.0.0-alpha5"
-    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha5"
+    implementation "com.phelat:livedatadsl:1.0.0-alpha7"
+    kapt "com.phelat:livedatadsl-processor:1.0.0-alpha7"
+}
+```
+#### For AndroidX
+```groovy
+dependencies {
+    implementation "com.phelat:livedatadsl:1.0.0-alpha7"
+    kapt "com.phelat:livedatadsl-processor-x:1.0.0-alpha7"
 }
 ```
