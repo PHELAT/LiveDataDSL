@@ -25,6 +25,7 @@ import javax.lang.model.element.TypeElement
 import javax.lang.model.element.VariableElement
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.TypeMirror
+import javax.lang.model.type.TypeVariable
 import javax.lang.model.util.Elements
 import javax.tools.Diagnostic
 
@@ -117,10 +118,9 @@ abstract class BaseProcessor : AbstractProcessor() {
         if (liveDataAnnotation != null) {
             if (variable.asType() is DeclaredType) {
                 val declaredType = variable.asType() as DeclaredType
-                val mutableLiveData = getMutableLiveData(declaredType)
-                val mutableLiveDataGenerics = mutableLiveData.typeArguments
+                val declaredTypeInheritance = DeclaredTypeInheritance(null, declaredType)
+                val mutableLiveDataGenerics = getMutableLiveDataGeneric(declaredTypeInheritance)
                 val observerGenerics = generateObserverGenerics(mutableLiveDataGenerics)
-                val liveDataGenerics = getGenericTypeNames(mutableLiveDataGenerics)
                 val functionGenerics = generateFunctionGenerics(observerGenerics)
 
                 val liveDataFieldName = "get${variableName.substring(0, 1)
@@ -130,7 +130,7 @@ abstract class BaseProcessor : AbstractProcessor() {
                 val rawLiveData = ClassName.get(getLifeCyclePackage(), "LiveData")
                 val liveData = ParameterizedTypeName.get(
                     rawLiveData,
-                    *liveDataGenerics.toTypedArray()
+                    *mutableLiveDataGenerics.toTypedArray()
                 )
 
                 val rawFunctionResult = ClassName.get(
@@ -157,7 +157,7 @@ abstract class BaseProcessor : AbstractProcessor() {
                     liveData,
                     liveDataObservationCode,
                     liveDataObserveForEverCode,
-                    liveDataGenerics,
+                    mutableLiveDataGenerics,
                     observer,
                     rawFunctionResult,
                     classBuilder
@@ -166,11 +166,11 @@ abstract class BaseProcessor : AbstractProcessor() {
         }
     }
 
-    private fun generateObserverGenerics(typeArguments: List<TypeMirror>): String {
+    private fun generateObserverGenerics(typeNames: List<TypeName>): String {
         val generics = StringBuilder()
-        typeArguments.forEachIndexed { index, typeMirror ->
-            generics.append(typeMirror.toString())
-            if (index < typeArguments.size - 1) {
+        typeNames.forEachIndexed { index, typeName ->
+            generics.append(typeName.box().toString())
+            if (index < typeNames.size - 1) {
                 generics.append(", ")
             }
         }
@@ -179,8 +179,14 @@ abstract class BaseProcessor : AbstractProcessor() {
 
     private fun getGenericTypeNames(typeArguments: List<TypeMirror>): List<TypeName> {
         val generics = mutableListOf<TypeName>()
-        typeArguments.forEach { typeMirror ->
-            val declaredType = typeMirror as DeclaredType
+        for (typeArgument in typeArguments) {
+            val declaredType = if (typeArgument is DeclaredType) {
+                typeArgument
+            } else if (typeArgument is TypeVariable) {
+                typeArgument.upperBound as DeclaredType
+            } else {
+                continue
+            }
             val typeElement = declaredType.asElement() as TypeElement
             val packageName = elementUtils.getPackageOf(typeElement).qualifiedName
             val typeName = declaredType.asElement().simpleName
@@ -190,17 +196,66 @@ abstract class BaseProcessor : AbstractProcessor() {
         return generics
     }
 
-    private fun getMutableLiveData(declaredType: DeclaredType): DeclaredType {
+    private fun getMutableLiveDataGeneric(declaredType: DeclaredTypeInheritance): List<TypeName> {
+        val typeElement = declaredType.self.asElement() as TypeElement
+        if (isDeclaredTypeLiveData(declaredType.self)) {
+            val generics = getGenericTypeNames(declaredType.self.typeArguments)
+            val genericClass = generics[0].box() as ClassName
+            val isGenericNameObject = genericClass.simpleName() == "Object"
+            val isGenericPackageObject = genericClass.packageName() == "java.lang"
+            return if (isGenericNameObject && isGenericPackageObject && declaredType.son != null) {
+                val liveDataGenericType = (declaredType.self.typeArguments[0] as TypeVariable)
+                val liveDataGenericName = liveDataGenericType.asElement().simpleName
+                getGenericTypeFromSon(declaredType, liveDataGenericName.toString())
+            } else {
+                generics
+            }
+        }
+        val superClassDeclaredType = typeElement.superclass as DeclaredType
+        return getMutableLiveDataGeneric(
+            DeclaredTypeInheritance(declaredType, superClassDeclaredType)
+        )
+    }
+
+    private fun getGenericTypeFromSon(
+        declaredType: DeclaredTypeInheritance,
+        genericName: String
+    ): List<TypeName> {
+        if (declaredType.son != null) {
+            val sonTypeName = ParameterizedTypeName.get(declaredType.son.self.asElement().asType())
+            val sonTypeArguments = (sonTypeName as ParameterizedTypeName).typeArguments
+            for ((index, sonTypeArgument) in sonTypeArguments.withIndex()) {
+                val sonGenericName = (sonTypeArgument as TypeVariableName).name
+                if (genericName.contentEquals(sonGenericName)) {
+                    val generic = declaredType.son.self.typeArguments[index]
+                    val sonGenericType = if (generic is DeclaredType) {
+                        generic
+                    } else {
+                        return getGenericTypeFromSon(declaredType.son, sonGenericName)
+                    }
+                    val sonTypeElement = sonGenericType.asElement() as TypeElement
+                    val packageName = elementUtils.getPackageOf(sonTypeElement).qualifiedName
+                    val typeName = sonGenericType.asElement().simpleName
+                    val sonGenericClassName = ClassName.get(
+                        packageName.toString(),
+                        typeName.toString()
+                    )
+                    return listOf(sonGenericClassName)
+                }
+            }
+            return getGenericTypeFromSon(declaredType.son, genericName)
+        }
+        return getGenericTypeNames(declaredType.self.typeArguments)
+    }
+
+    private fun isDeclaredTypeLiveData(declaredType: DeclaredType): Boolean {
         val typeElement = declaredType.asElement() as TypeElement
         val packageName = elementUtils.getPackageOf(typeElement).qualifiedName
         val variableTypeName = declaredType.asElement().simpleName
         val isPackageArch = packageName.contentEquals(getLifeCyclePackage())
-        val isClassLiveData = variableTypeName.contentEquals("MutableLiveData")
-        return if (isPackageArch && isClassLiveData) {
-            declaredType
-        } else {
-            getMutableLiveData(typeElement.superclass as DeclaredType)
-        }
+        val isClassLiveData = variableTypeName.contentEquals("LiveData")
+        val isClassMutableLiveData = variableTypeName.contentEquals("MutableLiveData")
+        return isPackageArch && (isClassLiveData || isClassMutableLiveData)
     }
 
     private fun generateLiveDataObservationCode(
