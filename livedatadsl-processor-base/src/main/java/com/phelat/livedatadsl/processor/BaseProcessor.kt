@@ -58,12 +58,19 @@ abstract class BaseProcessor : AbstractProcessor() {
     private fun processTypeElement(typeElement: TypeElement) {
         val packageName = elementUtils.getPackageOf(typeElement).qualifiedName.toString()
         val typeName = typeElement.simpleName.toString()
-        val className = ClassName.get(packageName, typeName)
+        val className = ParameterizedTypeName.get(typeElement.asType())
         val generatedClass = ClassName.get(packageName, "${typeName}_DSL")
 
         val classBuilder = TypeSpec.classBuilder(generatedClass).apply {
             addModifiers(Modifier.PUBLIC)
             superclass(className)
+            if (className is ParameterizedTypeName) {
+                for (typeArgument in className.typeArguments) {
+                    if (typeArgument is TypeVariableName) {
+                        addTypeVariable(typeArgument)
+                    }
+                }
+            }
             generateBodyOfClass(typeElement, this)
         }
 
