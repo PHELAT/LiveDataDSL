@@ -1,4 +1,4 @@
-# LiveDataDSL
+# LiveDataDSL [![](https://api.bintray.com/packages/m4hdi/LiveDataDSL/LiveDataDSL/images/download.svg)](https://bintray.com/beta/#/m4hdi/LiveDataDSL?tab=packages)
 Generates DSL for LiveData observation.
 ```kotlin
 loginViewModel.apply {
